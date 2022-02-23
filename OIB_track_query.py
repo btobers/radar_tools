@@ -1,67 +1,91 @@
 ### OIB_track_query.py ###
 """ read in OIB-AK-tracks.gpkg to query
 all tracks within geographic area or date range
+and export a list of the queried tracks
 
-env: ragu
 
 Brandon S. Tober
-01MAR2021
+20210301
+updated: 20220223
 """
 ### imports ###
-import os,sys
+import os,sys,argparse
 import fiona
 from shapely.geometry import Point, LineString, Polygon
 from shapely import wkt
 
-# inputs
-pfix = "/mnt/g/MARS/targ/supl/UAF/radar/2021/"
-fpath = pfix + "OIB_2021_tracks.gpkg"
-# x = [-141.5, -139.7]        # x lower, upper bounds
-# y = [59.6, 60.5]            # y lower, upper bounds
-out_fname = "kenneth_2021_tracks.txt"
+def query(gpkg,l,r,b,t,out):
+    """
+    open gpkg file and use lat, lon inputs to create bounding poly from which to query tracks and export file names
+    this is currently based on the hierarchy data organization with NSIDC
+    """
+    # initialize output file list
+    fout = open(out, "w")
 
-# initialize output file list
-out = []
-fout = open("/mnt/c/Users/btobers/Documents/data/radar/kennicott/" + out_fname, "w")
+    # create area polygon using input lat lon as wkt inputs
+    # poly = wkt.loads("MULTIPOLYGON (((-144.2 60, -144.2 60.72, -139.8 60.7,-139.9 59.5, -144.2 60)))")
+    poly = wkt.loads(f"MULTIPOLYGON ((({l} {b}, {l} {t}, {r} {t}, {r} {b}, {l} {b})))")
 
-# # create area polygon
-# points = [[x[0],y[0]],
-#         [x[1],y[0]],
-#         [x[1],y[1]],
-#         [x[0],y[1]],
-#         [x[0],y[0]]]
-# poly = Polygon(points)
-# poly = wkt.loads("POLYGON ((-140.237214236105 60.2730619913547,\
-#                             -139.774371622576 59.8105500244558,\
-#                             -140.625452260143 59.6734001530028,\
-#                             -141.337733991742 59.9006519264868,\
-#                             -140.86909574261 60.2714177201349,\
-#                             -140.237214236105 60.2730619913547))")
+    # get parent folder 
+    path = os.path.dirname(gpkg)
 
-poly = wkt.loads("MULTIPOLYGON (((-143.28780902582 61.7795298326555,-142.771338593303 61.4678247363248,-142.942685254444 61.3645306498214,-143.448826278311 61.6981097879999,-143.28780902582 61.7795298326555)))")
+    layers = fiona.listlayers(gpkg)
 
-if not os.path.isfile(fpath):
-    sys.exit(1)
+    print("-------------Query Results:-------------")
+    for layer in layers:
+        # print(layer)
+        with fiona.open(gpkg, layer=layer) as layer:
 
-layers = fiona.listlayers(fpath)
+            for feature in layer:
+                ls_3d = LineString(feature["geometry"]["coordinates"])
+                ls_2d = LineString([xy[0:2] for xy in list(ls_3d.coords)]) 
 
-for layer in layers:
-    print(layer)
-    with fiona.open(fpath, layer=layer) as layer:
+                if ls_2d.intersects(poly):
+                    fn = feature["properties"]["fname"]
+                    year = fn[:4]
+                    if os.path.isfile(path + "/hdf5/" + fn):
+                        print(path + "/hdf5/" + fn)
+                        fout.write(path + "/hdf5/" + fn + "\n")
 
-        for feature in layer:
-            ls_3d = LineString(feature["geometry"]["coordinates"])
-            ls_2d = LineString([xy[0:2] for xy in list(ls_3d.coords)]) 
+                    else:
+                        # print(fn)
+                        pass
+            
+    fout.close()
 
-            if ls_2d.intersects(poly):
-                fn = feature["properties"]["fname"]
-                year = fn[:4]
-                if os.path.isfile(pfix + "/hdf5/" + fn):
-                    fout.write(pfix + "/hdf5/" + fn + "\n")
-                elif os.path.isfile(pfix + + "/hdf5/" + fn):
-                    fout.write(pfix + "/hdf5/" + fn + "\n")
-                else:
-                    print(fn)
-                    pass
-        
-fout.close()
+    return
+
+
+
+def main():
+
+    # Set up CLI
+    parser = argparse.ArgumentParser(
+    description="Program for querying NASA OIB radar tracks based on latitude/longitude bounds"
+    )
+    parser.add_argument("gpkg", help="path to geopackage containing radar profiles", nargs="+")
+    parser.add_argument("lon0", help="western longitude bound", nargs="+")
+    parser.add_argument("lon1", help="eastern longitude bound", nargs="+")
+    parser.add_argument("lat0", help="southern latitude bound", nargs="+")
+    parser.add_argument("lat1", help="northern latitude bound", nargs="+")
+    parser.add_argument("out", help="path of output query results text file", nargs="+")
+    args = parser.parse_args()
+    out = args.out[0]
+    if not out.endswith(".txt"):
+        out += ".txt"
+
+    # check if path exists
+    if not os.path.isfile(args.gpkg[0]):
+        print(f"Geopackage not found: {args.gpkg[0]}")
+        exit(1)
+
+    # call the query function to go through the geopackage and query tracks based on bounding box and save file with track paths
+    query(args.gpkg[0], args.lon0[0], args.lon1[0], args.lat0[0], args.lat1[0], out)
+
+
+    print(f"Query results exported to:\t {os.path.abspath(out)}")
+
+
+# execute if run as a script
+if __name__ == "__main__":
+    main()
