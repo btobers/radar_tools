@@ -37,15 +37,9 @@ def merge(dir):
     merged_dict = {}
     # get list of pick files
     flist = glob.glob(dir + "*pk*.csv")
-    # first we'll need to open a file and get all the unique fields that we'll need to make arrays for
-    df = pd.read_csv(flist[0])
-    cols = list(df.columns)
-    dtypes = df.dtypes
 
-    # instatiate an array for each column
+    # instatiate an array to hold track name for each trace in all files - this won't be encountered in the individual files so we must do it ahead of time
     merged_dict["track"] = np.array([]).astype(str)
-    for i, col in enumerate(cols):
-        merged_dict[col] = np.array([]).astype(dtypes[i])
 
     for f in flist:
         # parse track name - this is a little kludgy but it does the trick
@@ -54,12 +48,30 @@ def merge(dir):
 
         # read file to dataframe
         df = pd.read_csv(f)
-
+        cols = list(df.columns)
+        dtypes = df.dtypes
+    
         # repeat track name for each trace
-        merged_dict["track"] = np.append(merged_dict["track"], np.repeat(fname,df.shape[0]))
+        merged_dict["track"] = np.append(merged_dict["track"], np.repeat(fname, df.shape[0]))
+
+        # hold total length of merged dictionary thus far - we'll need this later in the loop
+        l0 = merged_dict["track"].shape[0]
+
         # loop through all fields and append to array in merged_dict
         for i, col in enumerate(cols):
+
+            # instatiate column 
+            if col not in merged_dict.keys():
+                merged_dict[col] = np.array([]).astype(dtypes[i])
+
+            # append series from df to merged dictionary
             merged_dict[col] = np.append(merged_dict[col], df[col])
+
+            # since some ragu exports may contain more horizons than others, we'll need to account for opening a file later that has additional fields - this would cause length inconsistencies in the merged dictionary
+            # account for length issues if a new column was added to the merged dictionary after the first file in the loop - add nan's to have equal length
+            l = merged_dict[col].shape[0]
+            if l != l0:
+                merged_dict[col] = np.append(np.repeat(np.nan, l0-l), merged_dict[col])
 
     return merged_dict
 
