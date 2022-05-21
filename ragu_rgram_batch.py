@@ -32,10 +32,13 @@ from tools import utils
 # function to load radargram and any accompanying picks
 def load(f, datPath, pickPath):
     # ingest radar data
-    fPath = datPath + "/" + f.rstrip("_pk_bst.csv") + ".h5"
+    fPath = datPath + "/" + f[:-len("__pk_bst.csv")] + ".h5"
     if os.path.isfile(fPath):
-        igst = ingest(fpath)
+        igst = ingest(fPath)
         rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
+    else:
+        print("Data file not found: {}".format(fPath))
+        return None, None
 
     # initialize dict to hold any import horizons
     horizons = {}
@@ -55,49 +58,99 @@ def load(f, datPath, pickPath):
 
     return rdata, horizons
 
-    # make a nice radargram
-    def rgram(rdata, horizons, params):
+# make a nice radargram
+def radargram(rdata, horizons, params, outPath):
+    nPanels = 3
+    if rdata.flags.sim:
+        # sim color limints
+        vsmin = np.floor(np.nanpercentile(rdata.sim,10))
+        vsmax = np.nanmax(rdata.sim)
+    else:
+        nPanels -= 1
 
-        # if clutter sim exists make 3 panels, otherwise 2
-        if rdata.flags.sim:
-            nPanels = 3
-            # sim color limints
-            vsmin = np.floor(np.nanpercentile(rdata.sim,10))
-            vsmax = np.nanmax(rdata.sim)
-        else:
-            nPanels = 2
-
-        # data color limits
-        vdmin = np.floor(np.nanpercentile(rdata.proc.get_curr_dB(),10))
-        vdmax = np.nanmax(rdata.proc.get_curr_dB())
-        extent = [0, rdata.tnum, rdata.snum, 0]
+    if len(horizons) == 0:
+        nPanels -=1
 
 
-
-        fig, ax = plt.subplots(panels, figsize=(params["pnlWidth"], nPanels*params["pnlHgt"]))
-        fig.suptitle(rdata.fn)
-
-
-srf_samps = rdata.pick.horizons["srf"]
-bed_samps = rdata.pick.horizons["bed_imported"]
-
-# plotting time
-# first, take a quick look at rgram to get an idea of zoomed extent preference to set in next cell
-
-extent = [0, rdata.tnum, rdata.snum, 0]
-fig, ax = plt.subplots(figsize=(20,10))
-ax.imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=cmap, vmin=vdmin, vmax=vdmax)
+    # data color limits
+    vdmin = np.floor(np.nanpercentile(rdata.proc.get_curr_dB(),10))
+    vdmax = np.nanmax(rdata.proc.get_curr_dB())
+    # radargram figure extent
+    extent = [0, rdata.tnum, rdata.snum, 0]
 
 
-# plotting parameters - set zoomed extent preferences based on figure above
-tl = 2500  # left trace
-tr = rdata.tnum   # right trace
-sb = 1500   # bottom sample
-st = 0   # top sample
-y_depth_s0 = 150    # sample number to set as zero-depth
-extent = [-tl, tr-tl, rdata.snum, 0]
+    # initialize figure
+    fig, ax = plt.subplots(nPanels, figsize=(params["pnlWidth"], nPanels*params["pnlHgt"]))
+    fig.suptitle(rdata.fn)
 
 
+    ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
+    # ax[0].set_xlim(tl, tr)
+    ax[0].set_ylim(int(rdata.snum*params["smplCutFact"]), 0)
+    ax[0].get_xaxis().set_visible(False)
+    ax[0].get_yaxis().set_visible(False)
+    # secaxy = ax[0].twinx()
+    # secaxy.yaxis.set_ticks_position("left")
+    # secaxy.yaxis.set_label_position("left")
+    # secaxy.set_ylim(utils.twtt2depth((sb - y_depth_s0) * rdata.dt),
+    #                 -1*utils.twtt2depth(y_depth_s0 * rdata.dt))
+    # secaxy.set_ylabel("Depth (m)")
+    # secaxy.set_yticks([0,500,1000])
+    secaxx = ax[0].twiny()
+    secaxx.xaxis.set_ticks_position("bottom")
+    secaxx.xaxis.set_label_position("bottom")
+    secaxx.set_xlim(rdata.navdf["dist"].iloc[0]*1e-3, rdata.navdf["dist"].iloc[-1]*1e-3)
+    secaxx.get_xaxis().set_visible(False)
+
+    if rdata.flags.sim:
+        ax[1].imshow(rdata.sim,  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vsmin, vmax=vsmax)
+        # ax[1].set_xlim(tl, tr)
+        ax[1].set_ylim(int(rdata.snum*params["smplCutFact"]), 0)
+        ax[1].get_xaxis().set_visible(False)
+        ax[1].get_yaxis().set_visible(False)
+        # secaxy = ax[1].twinx()
+        # secaxy.yaxis.set_ticks_position("left")
+        # secaxy.yaxis.set_label_position("left")
+        # secaxy.set_ylim(utils.twtt2depth((sb - y_depth_s0) * rdata.dt),
+        #                 -1*utils.twtt2depth(y_depth_s0 * rdata.dt))
+        # secaxy.set_ylabel("Depth (m)")
+        # secaxy.set_yticks([0,500,1000])
+        secaxx = ax[1].twiny()
+        secaxx.xaxis.set_ticks_position("bottom")
+        secaxx.xaxis.set_label_position("bottom")
+        secaxx.set_xlim(rdata.navdf["dist"].iloc[-1]*1e-3, rdata.navdf["dist"].iloc[-1]*1e-3)
+        secaxx.get_xaxis().set_visible(False)
+
+    ax[-1].imshow(rdata.proc.get_curr_dB(),  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
+    # ax[-1].set_xlim(tl, tr)
+    ax[-1].set_ylim(int(rdata.snum*params["smplCutFact"]), 0)
+    for hz in horizons.items():
+        ax[-1].plot(hz)
+    ax[-1].get_xaxis().set_visible(False)
+    ax[-1].get_yaxis().set_visible(False)
+    # secaxy = ax[-1].twinx()
+    # secaxy.yaxis.set_ticks_position("left")
+    # secaxy.yaxis.set_label_position("left")
+    # secaxy.set_ylim(utils.twtt2depth((sb - y_depth_s0) * rdata.dt),
+    #                 -1*utils.twtt2depth(y_depth_s0 * rdata.dt))
+    # secaxy.set_ylabel("Depth (m)")
+    # secaxy.set_yticks([0,500,1000])
+    secaxx = ax[-1].twiny()
+    secaxx.xaxis.set_ticks_position("bottom")
+    secaxx.xaxis.set_label_position("bottom")
+    secaxx.set_xlim(rdata.navdf["dist"].iloc[0]*1e-3, rdata.navdf["dist"].iloc[-1]*1e-3)
+    secaxx.set_xlabel("Along-Track Distance (km)")
+
+    fig.tight_layout()
+    plt.subplots_adjust(wspace=0, hspace=0.1)
+    fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=500, bbox_inches='tight', pad_inches=0.05, transparent=True)# facecolor = "#d9d9d9")
+
+
+
+    # srf_samps = rdata.pick.horizons["srf"]
+    # bed_samps = rdata.pick.horizons["bed_imported"]
+
+    return
 
 
 def main():
@@ -106,12 +159,11 @@ def main():
     parser = argparse.ArgumentParser(
     description="Program for creating radargrams for a list of datafiles with corresponding pick files"
     )
-    parser.add_argument("files", help="List of files to create radargrams for", nargs="+")
+    parser.add_argument("fileList", help="List of files for which to create radargrams", nargs="+")
     parser.add_argument("datPath", help="Path to radar datafiles", nargs="+")
     parser.add_argument("pickPath", help="Path to RAGU radar pick files", nargs="+")
     parser.add_argument("outPath", help="Path to to output generated radargrams", nargs="+")
     args = parser.parse_args()
-
     # plotting parameters
     params = {}
     params["cmap"] = "Greys_r"                            # matplotlib.pyplot.imshow color map
@@ -134,3 +186,25 @@ def main():
     
     else:
         pass
+
+    # loop through list of files, load radargram and any picks, generate radargram
+    with open(args.fileList[0]) as files:
+        for f in files:
+            rdata, horizons = load(
+                f,
+                args.datPath[0],
+                args.pickPath[0]
+            )
+            print(rdata, horizons)
+            
+
+            radargram(
+                rdata,
+                horizons,
+                params,
+                args.outPath[0],
+            )
+
+# execute if run as a script
+if __name__ == "__main__":
+    main()
