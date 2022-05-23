@@ -31,7 +31,6 @@ from tools import utils
 def load(f, datPath, pickPath):
     # ingest radar data
     fPath = datPath + "/" + f[:-len("__pk_bst.csv")] + ".h5"
-    print(fPath)
     if os.path.isfile(fPath):
         igst = ingest(fPath)
         rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
@@ -110,12 +109,10 @@ def radargram(rdata, horizons, params, outPath):
     ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
     ax[0].set_ylim(int(extent[2]*params["yCutFact"]), 0)
 
-
     # Middle panel - clutter simulation, if present
     if rdata.flags.sim:
         ax[1].imshow(rdata.sim,  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vsmin, vmax=vsmax)
         ax[1].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-
 
     # Bottom plot - radargram with interpretations
     if nHzs > 0:
@@ -123,8 +120,6 @@ def radargram(rdata, horizons, params, outPath):
         ax[-1].set_ylim(int(extent[2]*params["yCutFact"]), 0)
         for hz in horizons.values():
             ax[-1].plot(np.linspace(0,extent[1],rdata.tnum), hz)
-
-
 
     ### labels ###
     # Turn off axis lines and ticks of the big subplot
@@ -157,9 +152,11 @@ def radargram(rdata, horizons, params, outPath):
 
     fig.tight_layout()
     plt.subplots_adjust(hspace=0.125)
-    # save
+    # save figure
     fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=500, bbox_inches='tight', pad_inches=0.05, transparent=True)
-
+    # clear the figure
+    plt.clf()
+    plt.close("all")
     return
 
 
@@ -180,9 +177,9 @@ def main():
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 1.5                                  # panel height in inches for each panel in the generated radargram
     params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = .5                                 # factor by which to trim the bottom half of the radargram (.5 will preserve the upper half of the samples across the radargram)
-    params["yAxis"] = "sample"                                # y axis label unit ("sample" or "time")
-    params["xAxis"] = "trace"                            # x axis label unit ("trace" or "distance")
+    params["yCutFact"] = .4                                 # factor by which to trim the bottom half of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
+    params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
 
     # check if paths exists
     if not os.path.isfile(args.fileList[0]):

@@ -25,8 +25,7 @@ def gpkg(fpath, df, crs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"):
     gdf = gpd.GeoDataFrame(df, crs=crs, geometry=geometry)
     gdf.to_file(fpath, driver="GPKG")
 
-    print("geopackage exported successfully:\t" + fpath)
-
+    return
 
 def merge(dir):
     """
@@ -42,6 +41,13 @@ def merge(dir):
     merged_dict["track"] = np.array([]).astype(str)
 
     for f in flist:
+        # skip any note file
+        if "note" in f:
+            continue
+        # skip combined pick files
+        if "combine" in f:
+            continue
+    
         # parse track name - this is a little kludgy but it does the trick
         fname = f.split("/")[-1].split('\\')[-1].rsplit("_pk_",1)[0]
         print(fname)
@@ -96,6 +102,10 @@ def main():
 
     # create pandas dataframe
     out = pd.DataFrame(data)
+
+    # get number of tracks
+    print(f"{len(out['track'].unique())} pick files combined.")
+
 
     # save output as text file and as geopackage
     out.to_csv(args.path[0] + args.fname[0] + ".csv", index=False)
