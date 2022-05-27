@@ -23,14 +23,14 @@ plt.rcParams["font.family"] = "Calibri"
 plt.rcParams['font.size'] = 10
 
 # append ragu path to access required modules
-sys.path.append("home/user/Documents/code/radar/ragu/code")
+sys.path.append("C:/Users/btober/OneDrive/Documents/code/radar/ragu/code")
 from ingest import ingest
 from tools import utils
 
 # function to load radargram and any accompanying picks
 def load(f, datPath, pickPath):
     # ingest radar data
-    fPath = datPath + "/" + f[:-len("__pk_bst.csv")] + ".h5"
+    fPath = datPath + "/" + f
     if os.path.isfile(fPath):
         igst = ingest(fPath)
         rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
@@ -40,8 +40,8 @@ def load(f, datPath, pickPath):
 
     # initialize dict to hold any import horizons
     horizons = {}
-    pickPath = pickPath + "/" + f.strip()
-    if os.path.isfile(pickPath):
+    if pickPath:
+        pickPath = pickPath + "/" + f[:-3] + "_pk_bst.csv"
         dat = pd.read_csv(pickPath)
         if dat.shape[0] != rdata.tnum:
             raise ValueError("import_pick error:\t pick file size does not match radar data")
@@ -166,56 +166,57 @@ def main():
     parser = argparse.ArgumentParser(
     description="Program for creating radargrams for a list of datafiles with corresponding pick files"
     )
-    parser.add_argument("fileList", help="List of files for which to create radargrams, alternately a single data file name", nargs="+")
-    parser.add_argument("datPath", help="Path to radar datafiles", nargs="+")
-    parser.add_argument("pickPath", help="Path to RAGU radar pick files", nargs="+")
-    parser.add_argument("outPath", help="Path to to output generated radargrams", nargs="+")
+    parser.add_argument("-f", dest = "fileList", help="List of files for which to create radargrams, alternately a single data file name", nargs="+")
+    parser.add_argument("-datpath", dest = "datPath", help="Path to radar datafiles")
+    parser.add_argument("-pkpath", dest = "pickPath", help="Path to RAGU radar pick files", nargs="?")
+    parser.add_argument("-outpath", dest = "outPath", help="Path to to output generated radargrams")
     args = parser.parse_args()
+    pkPath = args.pickPath
 
     # plotting parameters
     params = {}
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 1.5                                  # panel height in inches for each panel in the generated radargram
     params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = .4                                 # factor by which to trim the bottom half of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["yCutFact"] = 2/6                                 # factor by which to trim the bottom half of the radargram (.5 will preserve the upper half of the samples across the radargram)
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
 
     # check if paths exists
-    if not os.path.isfile(args.fileList[0]):
-        print(f"File list not found: {args.fileList[0]}")
+    if not os.path.isdir(args.datPath):
+        print(f"Data file path not found: {args.datPath}")
         exit(1)
 
-    elif not os.path.isdir(args.datPath[0]):
-        print(f"Data file path not found: {args.datPath[0]}")
+    flist = args.fileList
+    if len(flist) == 1 and os.path.isfile(flist[0]):
+        with open(flist[0]) as f:
+            flist = [line.strip() for line in f]
+
+    if pkPath:
+        if not os.path.isdir(pkPath):
+            pkPath = None
+            print(f"Pick file path not found: {args.pickPath}")
+            print("Radargrams will be generated without picks.")
+
+    if not os.path.isdir(args.outPath):
+        print(f"Output path not found: {args.outPath}")
         exit(1)
 
-    elif not os.path.isdir(args.pickPath[0]):
-        print(f"Pick file path not found: {args.pickPath[0]}")
-        exit(1)
-
-    elif not os.path.isdir(args.outPath[0]):
-        print(f"Output path not found: {args.outPath[0]}")
-        exit(1)
-    
-    else:
-        pass
 
     # loop through list of files, load radargram and any picks, generate radargram
-    with open(args.fileList[0]) as files:
-        for f in files:
-            rdata, horizons = load(
-                f,
-                args.datPath[0],
-                args.pickPath[0]
-            )            
+    for f in flist:
+        rdata, horizons = load(
+            f,
+            args.datPath,
+            pkPath
+        )            
 
-            radargram(
-                rdata,
-                horizons,
-                params,
-                args.outPath[0],
-            )
+        radargram(
+            rdata,
+            horizons,
+            params,
+            args.outPath,
+        )
 
 # execute if run as a script
 if __name__ == "__main__":
