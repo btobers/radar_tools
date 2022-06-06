@@ -236,8 +236,8 @@ def main():
 
     # Set up CLI
     parser = argparse.ArgumentParser(
-    description="Program for creating radargrams for a list of datafiles with corresponding pick files"
-    )
+    description="""description: program for creating radargrams for a list of datafiles with corresponding pick files\n\nexample call: $python ragu_rgram_batch.py -f IRARES1B_20180819-215207.h5 -datpath /home/user/data/radar/ -pkpath /home/user/data/radar/pick/ -outpath /home/user/pres/ -elev""",
+    formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("-f", dest = "fileList", help="List of files for which to create radargrams, alternately a single data file name", nargs="+")
     parser.add_argument("-datpath", dest = "datPath", help="Path to radar datafiles")
     parser.add_argument("-pkpath", dest = "pickPath", help="Path to RAGU radar pick files", nargs="?")
