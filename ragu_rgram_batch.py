@@ -4,7 +4,7 @@ Batch radargram script
 This script loops through a directory containing radar datafiles and RAGU generated pick files and creates a radargram for each set
 
 Created by: Brandon S. Tober
-Date: 20220520
+Date: 22222522
 
 Dependencies:
 - ragu (https://github.com/btobers/ragu)
@@ -37,7 +37,7 @@ def get_ax_size(fig, ax):
     return width, height
 
 # function to load radargram and any accompanying picks
-def load(f, datPath, pickPath, elev):
+def load(f, datPath, pickPath, elevFlag):
     # ingest radar data
     fPath = datPath + "/" + f
     if os.path.isfile(fPath):
@@ -63,13 +63,15 @@ def load(f, datPath, pickPath, elev):
                 horizon = horizon.split("_")[0]
                 # add to horizon dict
                 horizon_dict[horizon] = dat[horizon + "_sample"].to_numpy()
-                if elev:
+                if elevFlag:
                     elev_dict[horizon] = dat[horizon + "_elev"].to_numpy()
 
     return rdata, horizon_dict, elev_dict
 
 # make a nice radargram
-def radargram(rdata, horizon_dict, elev_dict, params, outPath):
+def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
+    if not simFlag:
+        rdata.flags.sim = False
     # determine if interpreted radargram panel is being created
     if len(horizon_dict) == 0:
         horizon_dict = None
@@ -132,11 +134,13 @@ def radargram(rdata, horizon_dict, elev_dict, params, outPath):
     # uninterpreted radargram
     ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
     ax[0].set_ylim(int(extent[2]*params["yCutFact"]), 0)
+    ax[0].set_xlim(0, int(extent[1]*params["xCutFact"]))
 
     # clutter simulation, if present
     if rdata.flags.sim:
         ax[1].imshow(rdata.sim,  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vsmin, vmax=vsmax)
         ax[1].set_ylim(int(extent[2]*params["yCutFact"]), 0)
+        ax[1].set_xlim(0, int(extent[1]*params["xCutFact"]))
 
     # radargram with interpretations, if present
     if horizon_dict is not None:
@@ -148,7 +152,8 @@ def radargram(rdata, horizon_dict, elev_dict, params, outPath):
         for (name, arr)  in horizon_dict.items():
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-        ax[pnl].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc='lower left', edgecolor='black', handlelength=0.8) 
+        ax[pnl].set_xlim(0, int(extent[1]*params["xCutFact"]))
+        ax[pnl].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
 
     # elevation profile, if flagged
     if elev_dict is not None:
@@ -160,7 +165,9 @@ def radargram(rdata, horizon_dict, elev_dict, params, outPath):
                 hline = True
         if hline:
             ax[-1].axhline(0, ls='--',c='k', alpha=.2,label='_nolegend_')           # zero-m WGS84 elevation (roughly sea level) 
-        ax[-1].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc='lower left', edgecolor='black', handlelength=0.8) 
+        ax[-1].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        ax[-1].set_xlim(0, int(extent[1]*params["xCutFact"]))
+        ax[-1].set_ylim([-300,700])
         # get vertical exag. for elev profile
         if params["xAxis"] == "distance":
             dx = (1e3*(ax[-1].get_xlim()[1]-ax[-1].get_xlim()[0]))
@@ -168,6 +175,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, outPath):
             xl,yl = get_ax_size(fig, ax[-1])
             ve = ((dx/xl)/(dy/yl))
             ax[-1].annotate("VE = " + str(round(ve)) + "x",xy=([.9,.05]), xycoords = "axes fraction")
+
 
 
     ### labels ###
@@ -188,7 +196,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, outPath):
         ax1.spines['left'].set_color('none')
         ax1.spines['right'].set_color('none')
         ax1.tick_params(labelcolor='1', top=False, bottom=False, left=False, right=False)
-        ax1.set_ylabel("Elevation (m)", labelpad=20)
+        ax1.set_ylabel("Elevation (m)", labelpad=22)
 
     else:
         ax0 = fig.add_subplot(111)
@@ -212,17 +220,22 @@ def radargram(rdata, horizon_dict, elev_dict, params, outPath):
             axis.set_xticklabels([])
         else:
             axis.set_xlim([extent[0], extent[1]])
+            axis.set_xlim(extent[0], int(extent[1]*params["xCutFact"]))
+
             if params["xAxis"] == "distance":
                 axis.set_xlabel("Along-Track Distance (km)")
             elif params["xAxis"] == "trace":
                 axis.set_xlabel("Trace")
 
     if params["yAxis"] == "sample":
-        ax0.set_ylabel("Sample", labelpad=20)
+        ax0.set_ylabel("Sample", labelpad=22)
     elif params["yAxis"] == "time":
-        ax0.set_ylabel(r'Two-Way Travel Time ($\mu$s)', labelpad=20)
+        ax0.set_ylabel(r'Two-Way Travel Time ($\mu$s)', labelpad=22)
             
-    fig.tight_layout()
+    try:
+        fig.tight_layout()
+    except Exception:
+        pass
     plt.subplots_adjust(hspace=0.125)
     # save figure
     fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=500, bbox_inches='tight', pad_inches=0.05, transparent=True)
@@ -236,13 +249,14 @@ def main():
 
     # Set up CLI
     parser = argparse.ArgumentParser(
-    description="""description: program for creating radargrams for a list of datafiles with corresponding pick files\n\nexample call: $python ragu_rgram_batch.py -f IRARES1B_20180819-215207.h5 -datpath /home/user/data/radar/ -pkpath /home/user/data/radar/pick/ -outpath /home/user/pres/ -elev""",
+    description="""description: program for creating radargrams for a list of datafiles with corresponding pick files\n\nexample call: $python ragu_rgram_batch.py -f IRARES1B_22180819-215227.h5 -datpath /home/user/data/radar/ -pkpath /home/user/data/radar/pick/ -outpath /home/user/pres/ -elev -sim""",
     formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("-f", dest = "fileList", help="List of files for which to create radargrams, alternately a single data file name", nargs="+")
     parser.add_argument("-datpath", dest = "datPath", help="Path to radar datafiles")
     parser.add_argument("-pkpath", dest = "pickPath", help="Path to RAGU radar pick files", nargs="?")
     parser.add_argument("-outpath", dest = "outPath", help="Path to to output generated radargrams")
     parser.add_argument("-elev", help="Flag: Include elevation profile", action="store_true")
+    parser.add_argument("-sim", help="Flag: Include clutter simulation if present", action="store_true")
     args = parser.parse_args()
     pkPath = args.pickPath
 
@@ -251,9 +265,11 @@ def main():
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 2                                    # panel height in inches for each panel in the generated radargram
     params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = 2/3                                # factor by which to trim the bottom half of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["yCutFact"] = 1/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["xCutFact"] = 1/2                                # factor by which to trim the right portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
+    params["lgd_pos"] = "lower left"                        # matplotlib legend position in subplot
 
     # check if paths exists
     if not os.path.isdir(args.datPath):
@@ -291,6 +307,7 @@ def main():
             horizons_dict,
             elev_dict,
             params,
+            args.sim,
             args.outPath,
         )
 

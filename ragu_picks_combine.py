@@ -83,11 +83,11 @@ def merge(dir):
 
 
 def main():
-
     # Set up CLI
     parser = argparse.ArgumentParser(
-    description="Program for merging a directory containing multiple RAGU pick files into a single merged pick file"
-    )
+    description='''Program for merging a directory containing multiple RAGU pick files into a single merged pick file\n\n$python ragu_picks_combine.py F:/MARS/orig/xtra/OIB-AK/radar/2015/pk_bst/ 2015_pk_bst''', 
+    formatter_class=argparse.RawTextHelpFormatter)
+    
     parser.add_argument("path", help="Path to RAGU pickfiles", nargs="+")
     parser.add_argument("fname", help="Output merged file name", nargs="+")
     args = parser.parse_args()
