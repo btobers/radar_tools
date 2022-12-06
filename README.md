@@ -13,6 +13,8 @@ This repository contains various useful radar scripts - mostly based on  [RAGU](
 
 *[ragu_pick_crossover.ipynb](https://github.com/btobers/radar_tools/blob/main/ragu_pick_crossover.ipynb)* performs a crossover analysis on RAGU radar picks
 
+*[ragu_pick_length.ipynb](https://github.com/btobers/radar_tools/blob/main/ragu_pick_length.ipynb)* calculates the line distance of RAGU radar picks
+
 *[ragu_picks_combine.py](https://github.com/btobers/radar_tools/blob/main/ragu_picks_combine.py)* combines all RAGU pick files in a given directory to a single text and geopackage export
 
 *[ragu_rgram.ipynb](https://github.com/btobers/radar_tools/blob/main/ragu_rgram.ipynb)* creates compiled radargrams using RAGU
