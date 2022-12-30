@@ -134,13 +134,13 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     # uninterpreted radargram
     ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
     ax[0].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-    ax[0].set_xlim(0, int(extent[1]*params["xCutFact"]))
+    ax[0].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
 
     # clutter simulation, if present
     if rdata.flags.sim:
         ax[1].imshow(rdata.sim,  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vsmin, vmax=vsmax)
         ax[1].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-        ax[1].set_xlim(0, int(extent[1]*params["xCutFact"]))
+        ax[1].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
 
     # radargram with interpretations, if present
     if horizon_dict is not None:
@@ -152,7 +152,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         for (name, arr)  in horizon_dict.items():
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-        ax[pnl].set_xlim(0, int(extent[1]*params["xCutFact"]))
+        ax[pnl].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
         ax[pnl].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
 
     # elevation profile, if flagged
@@ -166,8 +166,8 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         if hline:
             ax[-1].axhline(0, ls='--',c='k', alpha=.2,label='_nolegend_')           # zero-m WGS84 elevation (roughly sea level) 
         ax[-1].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
-        ax[-1].set_xlim(0, int(extent[1]*params["xCutFact"]))
-        ax[-1].set_ylim([-300,700])
+        ax[-1].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
+        # ax[-1].set_ylim([-300,700])
         # get vertical exag. for elev profile
         if params["xAxis"] == "distance":
             dx = (1e3*(ax[-1].get_xlim()[1]-ax[-1].get_xlim()[0]))
@@ -219,8 +219,8 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         if i < nPanels - 1:
             axis.set_xticklabels([])
         else:
-            axis.set_xlim([extent[0], extent[1]])
-            axis.set_xlim(extent[0], int(extent[1]*params["xCutFact"]))
+            # axis.set_xlim([extent[0], extent[1]])
+            axis.set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
 
             if params["xAxis"] == "distance":
                 axis.set_xlabel("Along-Track Distance (km)")
@@ -238,7 +238,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         pass
     plt.subplots_adjust(hspace=0.125)
     # save figure
-    fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=500, bbox_inches='tight', pad_inches=0.05, transparent=True)
+    fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=500, bbox_inches='tight', pad_inches=0.05, transparent=True, facecolor='white')
     # clear the figure
     plt.clf()
     plt.close("all")
@@ -249,7 +249,7 @@ def main():
 
     # Set up CLI
     parser = argparse.ArgumentParser(
-    description="""description: program for creating radargrams for a list of datafiles with corresponding pick files\n\nexample call: $python ragu_rgram_batch.py -f IRARES1B_22180819-215227.h5 -datpath /home/user/data/radar/ -pkpath /home/user/data/radar/pick/ -outpath /home/user/pres/ -elev -sim""",
+    description="""description: program for creating radargrams for a list of datafiles with corresponding pick files\n\nexample call: $python ragu_rgram_batch.py -f IRARES1B_20180819-215227.h5 -datpath /home/user/data/radar/ -pkpath /home/user/data/radar/pick/ -outpath /home/user/pres/ -elev -sim""",
     formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("-f", dest = "fileList", help="List of files for which to create radargrams, alternately a single data file name", nargs="+")
     parser.add_argument("-datpath", dest = "datPath", help="Path to radar datafiles")
@@ -265,8 +265,8 @@ def main():
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 2                                    # panel height in inches for each panel in the generated radargram
     params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = 1/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
-    params["xCutFact"] = 1/2                                # factor by which to trim the right portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["yCutFact"] = 1/2                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["xCutFact"] = (0,1)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
     params["lgd_pos"] = "lower left"                        # matplotlib legend position in subplot
