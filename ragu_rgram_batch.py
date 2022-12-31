@@ -150,22 +150,22 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             pnl = 2 
         ax[pnl].imshow(rdata.proc.get_curr_dB(),  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
         for (name, arr)  in horizon_dict.items():
-            ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, label=name)
+            ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
         ax[pnl].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
-        ax[pnl].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        ax[pnl].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
 
     # elevation profile, if flagged
     if elev_dict is not None:
         # if elevation drops below zero, add 0 horizontal line
         hline = False
         for (name, arr)  in elev_dict.items():
-            ax[-1].plot(np.linspace(0,extent[1],rdata.tnum), arr, label=name)
+            ax[-1].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
             if (arr<0).sum() > 0:
                 hline = True
         if hline:
             ax[-1].axhline(0, ls='--',c='k', alpha=.2,label='_nolegend_')           # zero-m WGS84 elevation (roughly sea level) 
-        ax[-1].legend(labels = ['Lidar Surface','Radar Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        ax[-1].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
         ax[-1].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
         # ax[-1].set_ylim([-300,700])
         # get vertical exag. for elev profile
@@ -265,7 +265,7 @@ def main():
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 2                                    # panel height in inches for each panel in the generated radargram
     params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = 1/2                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["yCutFact"] = 2/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
     params["xCutFact"] = (0,1)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
