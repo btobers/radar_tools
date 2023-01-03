@@ -134,13 +134,13 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     # uninterpreted radargram
     ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
     ax[0].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-    ax[0].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
+    ax[0].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
 
     # clutter simulation, if present
     if rdata.flags.sim:
         ax[1].imshow(rdata.sim,  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vsmin, vmax=vsmax)
         ax[1].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-        ax[1].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
+        ax[1].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
 
     # radargram with interpretations, if present
     if horizon_dict is not None:
@@ -152,7 +152,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         for (name, arr)  in horizon_dict.items():
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
-        ax[pnl].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
+        ax[pnl].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
         ax[pnl].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
 
     # elevation profile, if flagged
@@ -166,7 +166,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         if hline:
             ax[-1].axhline(0, ls='--',c='k', alpha=.2,label='_nolegend_')           # zero-m WGS84 elevation (roughly sea level) 
         ax[-1].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
-        ax[-1].set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
+        ax[-1].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
         # ax[-1].set_ylim([-300,700])
         # get vertical exag. for elev profile
         if params["xAxis"] == "distance":
@@ -220,7 +220,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             axis.set_xticklabels([])
         else:
             # axis.set_xlim([extent[0], extent[1]])
-            axis.set_xlim(int(extent[1]*params["xCutFact"][0]), int(extent[1]*params["xCutFact"][1]))
+            axis.set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
 
             if params["xAxis"] == "distance":
                 axis.set_xlabel("Along-Track Distance (km)")
