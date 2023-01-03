@@ -27,7 +27,7 @@ def gpkg(fpath, df, crs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"):
 
     return
 
-def merge(dir):
+def merge(dir, merged=False):
     """
     merge() goes through a file directory and reads in all RAGU .csv pick files
     then merges them into a single set of numpy arrays to be saved
@@ -37,8 +37,9 @@ def merge(dir):
     # get list of pick files
     flist = glob.glob(dir + "*pk*.csv")
 
-    # instatiate an array to hold track name for each trace in all files - this won't be encountered in the individual files so we must do it ahead of time
-    merged_dict["track"] = np.array([]).astype(str)
+    if not merged:
+        # instatiate an array to hold track name for each trace in all files - this won't be encountered in the individual files so we must do it ahead of time
+        merged_dict["track"] = np.array([]).astype(str)
 
     for f in flist:
         # skip any note file
@@ -48,20 +49,19 @@ def merge(dir):
         if "combine" in f:
             continue
     
-        # parse track name - this is a little kludgy but it does the trick
-        fname = f.split("/")[-1].split('\\')[-1].rsplit("_pk_",1)[0]
-        print(fname)
-
+        print(f)
         # read file to dataframe
         df = pd.read_csv(f)
         cols = list(df.columns)
         dtypes = df.dtypes
-    
-        # repeat track name for each trace
-        merged_dict["track"] = np.append(merged_dict["track"], np.repeat(fname, df.shape[0]))
 
-        # hold total length of merged dictionary thus far - we'll need this later in the loop
-        l0 = merged_dict["track"].shape[0]
+        if not merged:
+            # parse track name - this is a little kludgy but it does the trick
+            fname = f.split("/")[-1].split('\\')[-1].rsplit("_pk_",1)[0]
+            # repeat track name for each trace
+            merged_dict["track"] = np.append(merged_dict["track"], np.repeat(fname, df.shape[0]))
+            # hold total length of merged dictionary thus far - we'll need this later in the loop
+            l0 = merged_dict["track"].shape[0]
 
         # loop through all fields and append to array in merged_dict
         for i, col in enumerate(cols):
@@ -73,11 +73,12 @@ def merge(dir):
             # append series from df to merged dictionary
             merged_dict[col] = np.append(merged_dict[col], df[col])
 
-            # since some ragu exports may contain more horizons than others, we'll need to account for opening a file later that has additional fields - this would cause length inconsistencies in the merged dictionary
-            # account for length issues if a new column was added to the merged dictionary after the first file in the loop - add nan's to have equal length
-            l = merged_dict[col].shape[0]
-            if l != l0:
-                merged_dict[col] = np.append(np.repeat(np.nan, l0-l), merged_dict[col])
+            if not merged:
+                # since some ragu exports may contain more horizons than others, we'll need to account for opening a file later that has additional fields - this would cause length inconsistencies in the merged dictionary
+                # account for length issues if a new column was added to the merged dictionary after the first file in the loop - add nan's to have equal length
+                l = merged_dict[col].shape[0]
+                if l != l0:
+                    merged_dict[col] = np.append(np.repeat(np.nan, l0-l), merged_dict[col])
 
     return merged_dict
 
@@ -90,6 +91,7 @@ def main():
     
     parser.add_argument("path", help="Path to RAGU pickfiles", nargs="+")
     parser.add_argument("fname", help="Output merged file name", nargs="+")
+    parser.add_argument('-merged', help='Flag: input files are merged from multiple tracks (not individual track pick files)', default=False, action='store_true')
     args = parser.parse_args()
 
     # check if path exists
@@ -98,14 +100,13 @@ def main():
         exit(1)
 
     # call the merge function to go through all files and merge all fields in pick files contained in path
-    data = merge(args.path[0])
+    data = merge(args.path[0], merged=args.merged)
 
     # create pandas dataframe
     out = pd.DataFrame(data)
 
     # get number of tracks
     print(f"{len(out['track'].unique())} pick files combined.")
-
 
     # save output as text file and as geopackage
     out.to_csv(args.path[0] + args.fname[0] + ".csv", index=False)
