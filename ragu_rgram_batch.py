@@ -167,14 +167,15 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             ax[-1].axhline(0, ls='--',c='k', alpha=.2,label='_nolegend_')           # zero-m WGS84 elevation (roughly sea level) 
         ax[-1].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
         ax[-1].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
-        # ax[-1].set_ylim([-300,700])
-        # get vertical exag. for elev profile
+
+        # get vertical exag. for elev profile - only display if greater than 1
         if params["xAxis"] == "distance":
             dx = (1e3*(ax[-1].get_xlim()[1]-ax[-1].get_xlim()[0]))
             dy = (ax[-1].get_ylim()[1]-ax[-1].get_ylim()[0])
             xl,yl = get_ax_size(fig, ax[-1])
-            ve = ((dx/xl)/(dy/yl))
-            ax[-1].annotate("VE = " + str(round(ve)) + "x",xy=([.9,.05]), xycoords = "axes fraction")
+            ve = round((dx/xl)/(dy/yl))
+            if ve > 1:
+                ax[-1].annotate("VE = " + str(ve) + "x",xy=([.9,.05]), xycoords = "axes fraction")
 
 
 
