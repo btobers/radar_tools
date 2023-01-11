@@ -129,10 +129,12 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             hgt_ratios.append(1)
 
     # initialize figure
-    fig, ax = plt.subplots(figsize=(params["pnlWidth"], nPanels*params["pnlHgt"]), 
+    fig, ax = plt.subplots(
+                                        figsize=(params["pnlWidth"], nPanels*params["pnlHgt"]), 
                                         nrows = nPanels,
                                         ncols = 1,
-                                        gridspec_kw={'height_ratios': hgt_ratios})
+                                        gridspec_kw={'height_ratios': hgt_ratios}
+                                        )
     ax[0].set_title(rdata.fn)
 
     # uninterpreted radargram
@@ -246,7 +248,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         pass
     plt.subplots_adjust(hspace=0.125)
     # save figure
-    fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=500, bbox_inches='tight', pad_inches=0.05, transparent=True, facecolor='white')
+    fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=400, transparent=True, facecolor='white')
     # clear the figure
     plt.clf()
     plt.close("all")
@@ -263,7 +265,7 @@ def main():
     parser.add_argument("-datpath", dest = "datPath", help="Path to radar datafiles")
     parser.add_argument("-pkpath", dest = "pickPath", help="Path to RAGU radar pick files", nargs="?")
     parser.add_argument("-outpath", dest = "outPath", help="Path to to output generated radargrams")
-    parser.add_argument("-elev", help="Flag: Include elevation profile", action="store_true")
+    parser.add_argument("-elev", help="Flag: Include elevation profile", default=False, action="store_true")
     parser.add_argument("-sim", help="Flag: Include clutter simulation if present", default=False, action="store_true")
     args = parser.parse_args()
     pkPath = args.pickPath
