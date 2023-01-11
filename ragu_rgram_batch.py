@@ -65,6 +65,9 @@ def load(f, datPath, pickPath, elevFlag):
                 horizon_dict[horizon] = dat[horizon + "_sample"].to_numpy()
                 if elevFlag:
                     elev_dict[horizon] = dat[horizon + "_elev"].to_numpy()
+    else:
+        # still retain surface if in rdata data file
+        horizon_dict["srf"] = rdata.pick.horizons[rdata.pick.get_srf()]
 
     return rdata, horizon_dict, elev_dict
 
@@ -72,13 +75,6 @@ def load(f, datPath, pickPath, elevFlag):
 def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     if not simFlag:
         rdata.flags.sim = False
-    # determine if interpreted radargram panel is being created
-    if len(horizon_dict) == 0:
-        horizon_dict = None
-
-    # determine if elevation panel is being created
-    if len(elev_dict) == 0:
-        elev_dict = None
 
     # determine number of figure panels
     nPanels = 4
@@ -90,12 +86,19 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     else:
         nPanels -= 1
 
-    # if no horizons, remove panel
-    if not horizon_dict:
+    # determine if interpreted radargram panel is being created
+    srfTop = False          # flag to indicat that surface horizon will be on upper panel
+    if len(horizon_dict) == 0:
+        horizon_dict = None
+        nPanels -=1
+    # if only a surface sample array exists, we'll plot it atop the top panel rather than adding an interpretation panel
+    elif (len(horizon_dict) == 1) and (list(horizon_dict.keys())[0] == "srf"):
+        srfTop = True
         nPanels -=1
 
-    # if no elev profile desired, remove panel
-    if not elev_dict:
+    # determine if elevation panel is being created
+    if len(elev_dict) == 0:
+        elev_dict = None
         nPanels -= 1
 
     # data color limits
@@ -110,8 +113,9 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     if params["yAxis"] == "time":
         extent[2] = rdata.snum*rdata.dt*1e6
         # convert horizons from sample to microseconds
-        for key, array in horizon_dict.items():
-            horizon_dict[key] = array*rdata.dt*1e6
+        if horizon_dict:
+            for key, array in horizon_dict.items():
+                horizon_dict[key] = array*rdata.dt*1e6
 
     # set subplot relative heights
     hgt_ratios = []
@@ -129,7 +133,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
                                         nrows = nPanels,
                                         ncols = 1,
                                         gridspec_kw={'height_ratios': hgt_ratios})
-    fig.suptitle(rdata.fn)
+    ax[0].set_title(rdata.fn)
 
     # uninterpreted radargram
     ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
@@ -145,15 +149,18 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     # radargram with interpretations, if present
     if horizon_dict is not None:
         # get appropriate panel number
-        pnl = 1
-        if rdata.flags.sim:
-            pnl = 2 
+        if srfTop:
+            pnl = 0
+        if not srfTop:
+            pnl = 1
+            if rdata.flags.sim:
+                pnl = 2 
         ax[pnl].imshow(rdata.proc.get_curr_dB(),  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
         for (name, arr)  in horizon_dict.items():
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
         ax[pnl].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
-        ax[pnl].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        # ax[pnl].legend(labels = ['Lidar Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
 
     # elevation profile, if flagged
     if elev_dict is not None:
@@ -257,7 +264,7 @@ def main():
     parser.add_argument("-pkpath", dest = "pickPath", help="Path to RAGU radar pick files", nargs="?")
     parser.add_argument("-outpath", dest = "outPath", help="Path to to output generated radargrams")
     parser.add_argument("-elev", help="Flag: Include elevation profile", action="store_true")
-    parser.add_argument("-sim", help="Flag: Include clutter simulation if present", action="store_true")
+    parser.add_argument("-sim", help="Flag: Include clutter simulation if present", default=False, action="store_true")
     args = parser.parse_args()
     pkPath = args.pickPath
 
@@ -265,8 +272,8 @@ def main():
     params = {}
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 2                                    # panel height in inches for each panel in the generated radargram
-    params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = 2/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["pnlWidth"] = 4                                # panel width in inches for each panel in the generated radargram
+    params["yCutFact"] = 1/2                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
     params["xCutFact"] = (0,1)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
