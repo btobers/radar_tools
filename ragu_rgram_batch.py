@@ -124,7 +124,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             if i == nPanels - 1:
                 hgt_ratios.append(1)
             else:
-                hgt_ratios.append(.8)
+                hgt_ratios.append(1)
         else:
             hgt_ratios.append(1)
 
@@ -162,7 +162,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
         ax[pnl].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
-        # ax[pnl].legend(labels = ['Lidar Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        ax[pnl].legend(labels = ['Lidar Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
 
     # elevation profile, if flagged
     if elev_dict is not None:
@@ -184,7 +184,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             xl,yl = get_ax_size(fig, ax[-1])
             ve = round((dx/xl)/(dy/yl))
             if ve > 1:
-                ax[-1].annotate("VE = " + str(ve) + "x",xy=([.9,.05]), xycoords = "axes fraction")
+                ax[-1].annotate("VE = " + str(ve) + "x",xy=([.8,.05]), xycoords = "axes fraction")
 
 
 
@@ -274,8 +274,8 @@ def main():
     params = {}
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 2                                    # panel height in inches for each panel in the generated radargram
-    params["pnlWidth"] = 4                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = 1/2                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
+    params["yCutFact"] = 2/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
     params["xCutFact"] = (0,1)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
