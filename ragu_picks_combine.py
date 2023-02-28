@@ -35,11 +35,11 @@ def merge(dir, merged=False):
     # we'll instatiate a dictionary to hold all our merged arrays
     merged_dict = {}
     # get list of pick files
-    flist = glob.glob(dir + "*pk*.csv")
+    flist = glob.glob(dir + "*.csv")
 
     if not merged:
         # instatiate an array to hold track name for each trace in all files - this won't be encountered in the individual files so we must do it ahead of time
-        merged_dict["track"] = np.array([]).astype(str)
+        merged_dict["fname"] = np.array([]).astype(str)
 
     for f in flist:
         # skip any note file
@@ -57,11 +57,11 @@ def merge(dir, merged=False):
 
         if not merged:
             # parse track name - this is a little kludgy but it does the trick
-            fname = f.split("/")[-1].split('\\')[-1].rsplit("_pk_",1)[0]
+            fname = f.split("/")[-1].split('\\')[-1].replace('.csv','')
             # repeat track name for each trace
-            merged_dict["track"] = np.append(merged_dict["track"], np.repeat(fname, df.shape[0]))
+            merged_dict["fname"] = np.append(merged_dict["fname"], np.repeat(fname, df.shape[0]))
             # hold total length of merged dictionary thus far - we'll need this later in the loop
-            l0 = merged_dict["track"].shape[0]
+            l0 = merged_dict["fname"].shape[0]
 
         # loop through all fields and append to array in merged_dict
         for i, col in enumerate(cols):
@@ -106,7 +106,7 @@ def main():
     out = pd.DataFrame(data)
 
     # get number of tracks
-    print(f"{len(out['track'].unique())} pick files combined.")
+    print(f"{len(out['fname'].unique())} pick files combined.")
 
     # save output as text file and as geopackage
     out.to_csv(args.path[0] + args.fname[0] + ".csv", index=False)

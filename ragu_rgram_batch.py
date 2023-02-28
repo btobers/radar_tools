@@ -39,19 +39,25 @@ def get_ax_size(fig, ax):
 # function to load radargram and any accompanying picks
 def load(f, datPath, pickPath, elevFlag):
     # ingest radar data
-    fPath = datPath + "/" + f
+    fPath = datPath + f
     if os.path.isfile(fPath):
         igst = ingest(fPath)
         rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
     else:
-        print("Data file not found: {}".format(fPath))
-        return None, None
+        fn = f.replace('IRUAFHF2','IRUAFHF1B').replace('IRARES2','IRARES1B')
+        fPath = datPath + fn
+        if os.path.isfile(fPath):
+            igst = ingest(fPath)
+            rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
+        else:
+            print("Data file not found: {}".format(fPath))
+            return None, None, None
 
     # initialize dict to hold any import horizons
     horizon_dict = {}
     elev_dict = {}
     if pickPath:
-        pickPath = pickPath + "/" + f[:-3] + "_pk_bst.csv"
+        pickPath = pickPath + "/" + f[:-3] + ".csv"
         dat = pd.read_csv(pickPath)
         if dat.shape[0] != rdata.tnum:
             raise ValueError("import_pick error:\t pick file size does not match radar data")
@@ -162,7 +168,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
         ax[pnl].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
-        ax[pnl].legend(labels = ['Lidar Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        ax[pnl].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
 
     # elevation profile, if flagged
     if elev_dict is not None:
@@ -248,7 +254,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         pass
     plt.subplots_adjust(hspace=0.125)
     # save figure
-    fig.savefig(outPath + "/" + rdata.fn + ".png", dpi=400, transparent=True, facecolor='white')
+    fig.savefig(outPath, dpi=400, transparent=True, facecolor='white')
     # clear the figure
     plt.clf()
     plt.close("all")
@@ -305,12 +311,17 @@ def main():
 
     # loop through list of files, load radargram and any picks, generate radargram
     for f in flist:
+
+        # parse appropriate year
+        yr = f.split('_')[1][:4]
+
         rdata, horizons_dict, elev_dict = load(
             f,
-            args.datPath,
+            args.datPath + yr + '/hdf5/',
             pkPath,
             args.elev
         )            
+        outPath = args.outPath + f[:-3] + '.png'
 
         radargram(
             rdata,
@@ -318,7 +329,7 @@ def main():
             elev_dict,
             params,
             args.sim,
-            args.outPath,
+            outPath,
         )
 
 # execute if run as a script
