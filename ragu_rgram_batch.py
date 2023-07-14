@@ -20,8 +20,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-plt.rcParams["font.family"] = "Calibri"
-plt.rcParams['font.size'] = 10
+plt.rcParams["font.family"] = "Arial"
+plt.rcParams['font.size'] = 8
 
 # append ragu path to access required modules
 sys.path.append("C:/Users/btober/OneDrive/Documents/code/radar/ragu/code")
@@ -45,7 +45,7 @@ def load(f, datPath, pickPath, elevFlag):
         rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
     else:
         fn = f.replace('IRUAFHF2','IRUAFHF1B').replace('IRARES2','IRARES1B')
-        fPath = datPath + fn
+        fPath = datPath + fn + '.h5'
         if os.path.isfile(fPath):
             igst = ingest(fPath)
             rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
@@ -57,7 +57,7 @@ def load(f, datPath, pickPath, elevFlag):
     horizon_dict = {}
     elev_dict = {}
     if pickPath:
-        pickPath = pickPath + "/" + f[:-3] + ".csv"
+        pickPath = pickPath + "/" + f + ".csv"
         dat = pd.read_csv(pickPath)
         if dat.shape[0] != rdata.tnum:
             raise ValueError("import_pick error:\t pick file size does not match radar data")
@@ -70,7 +70,10 @@ def load(f, datPath, pickPath, elevFlag):
                 # add to horizon dict
                 horizon_dict[horizon] = dat[horizon + "_sample"].to_numpy()
                 if elevFlag:
-                    elev_dict[horizon] = dat[horizon + "_elev"].to_numpy()
+                    elev_dict[horizon] = dat[horizon + "_hgt"].to_numpy()
+                    # if horizon=='bed':
+                    #     elev_dict['bed_amp'] = dat['bed_amp']
+                    #     elev_dict['ice_thickness'] = dat['srf_bed_thick']
     else:
         # still retain surface if in rdata data file
         horizon_dict["srf"] = rdata.pick.horizons[rdata.pick.get_srf()]
@@ -141,7 +144,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
                                         ncols = 1,
                                         gridspec_kw={'height_ratios': hgt_ratios}
                                         )
-    ax[0].set_title(rdata.fn)
+    # ax[0].set_title(rdata.fn)
 
     # uninterpreted radargram
     ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
@@ -168,19 +171,38 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
         ax[pnl].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
-        ax[pnl].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        # ax[pnl].legend(labels = ['Surface','Bed'], fancybox=False, frameon=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor=None, handlelength=0.8, frameon=True, framealpha=.6, ncol=2, columnspacing=1) 
+        # leg = ax[pnl].legend(labels = ['Surface','Bed'], fancybox=False, frameon=True, framealpha=.6, borderaxespad=0, loc='lower right', edgecolor=None, handlelength=0.8, ncol=2,columnspacing=1) 
+        # leg.get_frame().set_edgecolor('k')
 
     # elevation profile, if flagged
     if elev_dict is not None:
         # if elevation drops below zero, add 0 horizontal line
         hline = False
         for (name, arr)  in elev_dict.items():
+            # if name == 'bed_amp':
+            #     a2 = ax[-1].twinx()
+            #     arr = pd.Series(arr).rolling(100).mean()
+            #     a2.plot(np.linspace(0,extent[1],rdata.tnum),20*np.log10(arr),lw=1, ls='-',color='r')
+            #     a2.set_ylabel('Return Power (dB)')
+            #     a2.yaxis.label.set_color('red')
+            #     a2.tick_params(axis='y', colors='red')
+            #     a2.spines['right'].set_color('red')
+                # a2.set_ylim([-70,130])
+                # a2.set_yticks([-50,0])
+                # a2.yaxis.label.set_color('C1')
+                # a2.tick_params(axis='y', colors='C1')
+                # a2.spines['right'].set_color('C1')
+            # elif name == 'ice_thickness':
+            #     ax[-1].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, c='k')
+            # # else:
             ax[-1].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
             if (arr<0).sum() > 0:
                 hline = True
+                # hline=False
         if hline:
             ax[-1].axhline(0, ls='--',c='k', alpha=.2,label='_nolegend_')           # zero-m WGS84 elevation (roughly sea level) 
-        ax[-1].legend(labels = ['Surface','Bed'], fancybox=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor='black', handlelength=0.8) 
+        ax[-1].legend(labels = ['Surface','Bed'], fancybox=False, frameon=False, borderaxespad=0, loc=params["lgd_pos"], edgecolor=None, handlelength=0.8)#, ncol=2,columnspacing=1) 
         ax[-1].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
 
         # get vertical exag. for elev profile - only display if greater than 1
@@ -190,7 +212,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             xl,yl = get_ax_size(fig, ax[-1])
             ve = round((dx/xl)/(dy/yl))
             if ve > 1:
-                ax[-1].annotate("VE = " + str(ve) + "x",xy=([.8,.05]), xycoords = "axes fraction")
+                ax[-1].annotate("VE = " + str(ve) + "x",xy=([.025,.04]), xycoords = "axes fraction")
 
 
 
@@ -230,6 +252,12 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     for i, axis in enumerate(ax):
         axis.yaxis.set_ticks_position('both')
         axis.xaxis.set_ticks_position('both')
+        if i==nPanels - 1:
+            axis.yaxis.set_ticks_position('both')
+            lim = axis.get_ylim()
+            axis.set_yticks([250,500,750,1000])
+            # axis.set_ylim(400,1500)
+            # axis.set_ylim(lim[0],1000)
 
         # turn off xtick labels for all but bottom panel
         if i < nPanels - 1:
@@ -252,12 +280,14 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         fig.tight_layout()
     except Exception:
         pass
-    plt.subplots_adjust(hspace=0.125)
+    plt.subplots_adjust(hspace=0.13)#,left=0.1,right=0.9)
+    # plt.tight_layout()
     # save figure
-    fig.savefig(outPath, dpi=400, transparent=True, facecolor='white')
+    fig.savefig(outPath, dpi=400, facecolor='white', transparent=True, bbox_inches="tight")
     # clear the figure
     plt.clf()
     plt.close("all")
+    print(f'Radargram saved to:\t{outPath}')
     return
 
 
@@ -279,13 +309,13 @@ def main():
     # plotting parameters
     params = {}
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
-    params["pnlHgt"] = 2                                    # panel height in inches for each panel in the generated radargram
-    params["pnlWidth"] = 6.5                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = 2/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
-    params["xCutFact"] = (0,1)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
+    params["pnlHgt"] = 1                                    # panel height in inches for each panel in the generated radargram
+    params["pnlWidth"] = 3                                # panel width in inches for each panel in the generated radargram
+    params["yCutFact"] = 1/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["xCutFact"] = (.1,.55)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
-    params["lgd_pos"] = "lower left"                        # matplotlib legend position in subplot
+    params["lgd_pos"] = "upper left"                        # matplotlib legend position in subplot
 
     # check if paths exists
     if not os.path.isdir(args.datPath):
@@ -308,7 +338,6 @@ def main():
         exit(1)
 
 
-
     # loop through list of files, load radargram and any picks, generate radargram
     for f in flist:
 
@@ -317,11 +346,11 @@ def main():
 
         rdata, horizons_dict, elev_dict = load(
             f,
-            args.datPath + yr + '/hdf5/',
+            args.datPath + yr+ '/hdf5/',
             pkPath,
             args.elev
         )            
-        outPath = args.outPath + f[:-3] + '.png'
+        outPath = args.outPath + f + '.png'
 
         radargram(
             rdata,

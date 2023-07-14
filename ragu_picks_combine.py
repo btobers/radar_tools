@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
-import sys, os, glob, argparse, fnmatch
+import sys, os, argparse, fnmatch
 
 # script designed to merge RAGU picks from one directory in to a single csv file
 # BST, 20191127
@@ -27,28 +27,19 @@ def gpkg(fpath, df, crs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"):
 
     return
 
-def merge(dir, merged=False):
+def merge(flist, merged=False):
     """
     merge() goes through a file directory and reads in all RAGU .csv pick files
     then merges them into a single set of numpy arrays to be saved
     """
     # we'll instatiate a dictionary to hold all our merged arrays
     merged_dict = {}
-    # get list of pick files
-    flist = glob.glob(dir + "*.csv")
 
     if not merged:
         # instatiate an array to hold track name for each trace in all files - this won't be encountered in the individual files so we must do it ahead of time
         merged_dict["fname"] = np.array([]).astype(str)
 
     for f in flist:
-        # skip any note file
-        if "note" in f:
-            continue
-        # skip combined pick files
-        if "combine" in f:
-            continue
-    
         print(f)
         # read file to dataframe
         df = pd.read_csv(f)
@@ -86,21 +77,37 @@ def merge(dir, merged=False):
 def main():
     # Set up CLI
     parser = argparse.ArgumentParser(
-    description='''Program for merging a directory containing multiple RAGU pick files into a single merged pick file\n\n$python ragu_picks_combine.py F:/MARS/orig/xtra/OIB-AK/radar/2015/pk_bst/ 2015_pk_bst''', 
+    description='''Program for merging a directory containing multiple RAGU pick files into a single merged pick file\n\n$python ragu_picks_combine.py --pickfiles /home/user/data/flist.txt --outdir /tmp --outname merged_picks\nalternatively:\n$python ragu_picks_combine.py --pickfiles /home/user/data/pickfile1.csv /home/user/data/pickfile2.csv --outdir /tmp --outname merged_picks''', 
     formatter_class=argparse.RawTextHelpFormatter)
     
-    parser.add_argument("path", help="Path to RAGU pickfiles", nargs="+")
-    parser.add_argument("fname", help="Output merged file name", nargs="+")
+    parser.add_argument("--pickfiles", help="Filepath for a list of RAGU pickfiles you with to merge (alternatively, a user entered list of pick files)", nargs="+")
+    parser.add_argument("--outdir", help="Output directory", required=True)
+    parser.add_argument("--outname", help="Output file name prefix (.csv and .gpkg files will be created with this name in outdir)", required=True)
     parser.add_argument('-merged', help='Flag: input files are merged from multiple tracks (not individual track pick files)', default=False, action='store_true')
     args = parser.parse_args()
 
-    # check if path exists
-    if not os.path.isdir(args.path[0]):
-        print(f"Path not found: {args.path[0]}")
-        exit(1)
+    # if length of args.pickfiles > 1, we'll assume the user is entering a list of pickfiles, else, we'll assume its a filepath to a list of pickfiles
+    if len(args.pickfiles) == 1:
+        assert os.path.exists(args.pickfiles), f'RAGU pick file list does not exist: {args.pickfiles}'
+        try:
+            with open(args.pickfiles, 'r') as f:
+                pkfiles = f.read().split('\n')
+        except Exception as err:
+            print(f'Error: Could not read pick file list: {err}')
+            sys.exit()
+
+    elif len(args.pickfiles) > 1:
+        pkfiles = args.pickfiles
+
+    # make sure each pick file exists
+    for f in pkfiles:
+        assert os.path.exists(f), f'RAGU pick file does not exist: {f}'
+
+    # assert that output path exists before merging
+    assert os.path.isdir(os.path.split(args.outdir)[0])    
 
     # call the merge function to go through all files and merge all fields in pick files contained in path
-    data = merge(args.path[0], merged=args.merged)
+    data = merge(flist=pkfiles, merged=args.merged)
 
     # create pandas dataframe
     out = pd.DataFrame(data)
@@ -109,12 +116,12 @@ def main():
     print(f"{len(out['fname'].unique())} pick files combined.")
 
     # save output as text file and as geopackage
-    out.to_csv(args.path[0] + args.fname[0] + ".csv", index=False)
-    if os.path.isfile(args.path[0] + args.fname[0] + ".gpkg"):
-        os.remove(args.path[0] + args.fname[0] + ".gpkg")
-    gpkg(args.path[0] + args.fname[0] + ".gpkg", out)
+    out.to_csv(args.outdir + "/" + args.outname + ".csv", index=False)
+    if os.path.isfile(args.outdir + "/" + args.outname + ".gpkg"):
+        os.remove(args.outdir + "/" + args.outname + ".gpkg")
+    gpkg(args.outdir + "/" + args.outname + ".gpkg", out)
 
-    print(f"Combined picks exported to:\t {args.path[0] + args.fname[0]}.csv, {args.path[0] + args.fname[0]}.gpkg")
+    print(f"Combined picks exported to:\t {args.outdir + '/' + args.outname}.csv, {args.outdir + '/' + args.outname}.gpkg")
 
 
 # execute if run as a script
