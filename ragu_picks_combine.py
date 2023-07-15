@@ -109,8 +109,8 @@ def main():
     # call the merge function to go through all files and merge all fields in pick files contained in path
     data = merge(flist=pkfiles, merged=args.merged)
 
-    # create pandas dataframe
-    out = pd.DataFrame(data)
+    # convert dictionary to pandas dataframe, but add one column at a time so that they will all end up the same length, also fill nans with -9999 as nd value
+    out = pd.DataFrame(dict([(col_name,pd.Series(values)) for col_name,values in data.items() ])).fillna(-9999)
 
     # get number of tracks
     print(f"{len(out['fname'].unique())} pick files combined.")
