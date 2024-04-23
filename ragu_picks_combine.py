@@ -80,18 +80,20 @@ def main():
     description='''Program for merging a directory containing multiple RAGU pick files into a single merged pick file\n\n$python ragu_picks_combine.py --pickfiles /home/user/data/flist.txt --outdir /tmp --outname merged_picks\nalternatively:\n$python ragu_picks_combine.py --pickfiles /home/user/data/pickfile1.csv /home/user/data/pickfile2.csv --outdir /tmp --outname merged_picks''', 
     formatter_class=argparse.RawTextHelpFormatter)
     
-    parser.add_argument("--pickfiles", help="Filepath for a list of RAGU pickfiles you with to merge (alternatively, a user entered list of pick files)", nargs="+")
-    parser.add_argument("--outdir", help="Output directory", required=True)
-    parser.add_argument("--outname", help="Output file name prefix (.csv and .gpkg files will be created with this name in outdir)", required=True)
+    parser.add_argument("-pickfiles", help="Filepath for a list of RAGU pickfiles you with to merge (alternatively, a user entered list of pick files)", nargs="+", required=True)
+    parser.add_argument("-outdir", help="Output directory", required=True)
+    parser.add_argument("-outname", help="Output file name prefix (.csv and .gpkg files will be created with this name in outdir)", required=True)
     parser.add_argument('-merged', help='Flag: input files are merged from multiple tracks (not individual track pick files)', default=False, action='store_true')
     args = parser.parse_args()
 
     # if length of args.pickfiles > 1, we'll assume the user is entering a list of pickfiles, else, we'll assume its a filepath to a list of pickfiles
     if len(args.pickfiles) == 1:
+        args.pickfiles = args.pickfiles[0]
         assert os.path.exists(args.pickfiles), f'RAGU pick file list does not exist: {args.pickfiles}'
         try:
             with open(args.pickfiles, 'r') as f:
-                pkfiles = f.read().split('\n')
+                pkfiles = f.read().splitlines()
+            pkfiles = [line.strip() for line in pkfiles if line.strip()]
         except Exception as err:
             print(f'Error: Could not read pick file list: {err}')
             sys.exit()

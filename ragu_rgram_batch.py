@@ -20,13 +20,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from ragu.ingest import ingest
+from ragu.tools import utils
 plt.rcParams["font.family"] = "Arial"
 plt.rcParams['font.size'] = 8
-
-# append ragu path to access required modules
-sys.path.append("C:/Users/btober/OneDrive/Documents/code/radar/ragu/code")
-from ingest import ingest
-from tools import utils
 
 # get_ax_size returns the size of a matplotlib axis
 def get_ax_size(fig, ax):
@@ -37,15 +34,15 @@ def get_ax_size(fig, ax):
     return width, height
 
 # function to load radargram and any accompanying picks
-def load(f, datPath, pickPath, elevFlag):
+def load(f, pickPath, args):
     # ingest radar data
-    fPath = datPath + f
+    fPath = args.datPath + f
     if os.path.isfile(fPath):
         igst = ingest(fPath)
         rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
     else:
         fn = f.replace('IRUAFHF2','IRUAFHF1B').replace('IRARES2','IRARES1B')
-        fPath = datPath + fn + '.h5'
+        fPath = args.datPath + fn + '.h5'
         if os.path.isfile(fPath):
             igst = ingest(fPath)
             rdata = igst.read("", navcrs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", body="earth")
@@ -57,7 +54,7 @@ def load(f, datPath, pickPath, elevFlag):
     horizon_dict = {}
     elev_dict = {}
     if pickPath:
-        pickPath = pickPath + "/" + f + ".csv"
+        pickPath = pickPath + "/" + f + "_pk_.csv"
         dat = pd.read_csv(pickPath)
         if dat.shape[0] != rdata.tnum:
             raise ValueError("import_pick error:\t pick file size does not match radar data")
@@ -68,15 +65,27 @@ def load(f, datPath, pickPath, elevFlag):
                 # pick files should have ["horizon_sample"] keys
                 horizon = horizon.split("_")[0]
                 # add to horizon dict
-                horizon_dict[horizon] = dat[horizon + "_sample"].to_numpy()
-                if elevFlag:
-                    elev_dict[horizon] = dat[horizon + "_hgt"].to_numpy()
+                horizon_dict[horizon] = dat[horizon + "_sample"].to_numpy() - rdata.flags.sampzero
+                if args.rev:
+                    horizon_dict[horizon] = np.flip(horizon_dict[horizon])
+                if args.elev:
+                    elev_dict[horizon] = dat[horizon + "_elev"].to_numpy()
+                    if args.rev:
+                        elev_dict[horizon] = np.flip(elev_dict[horizon])
                     # if horizon=='bed':
                     #     elev_dict['bed_amp'] = dat['bed_amp']
                     #     elev_dict['ice_thickness'] = dat['srf_bed_thick']
     else:
         # still retain surface if in rdata data file
-        horizon_dict["srf"] = rdata.pick.horizons[rdata.pick.get_srf()]
+        horizon_dict["srf"] = rdata.pick.horizons[rdata.pick.get_srf()] - rdata.flags.sampzero
+        if args.rev:
+            horizon_dict["srf"] = np.flip(horizon_dict["srf"])
+
+    if args.rev:
+        rdata.reverse()
+        # reshift time zero
+        if rdata.flags.sampzero>0:
+            rdata.tzero_shift()
 
     return rdata, horizon_dict, elev_dict
 
@@ -110,9 +119,20 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
         elev_dict = None
         nPanels -= 1
 
+    # amp = rdata.proc.get_curr_amp()
+    # twtt = np.arange(rdata.snum)*rdata.dt
+    # factor = np.reshape(twtt**(float(2)),(len(twtt),1))
+    # factmat = np.matlib.repmat(factor,1,rdata.tnum)
+    # out = np.multiply(amp,factmat)
+
     # data color limits
-    vdmin = np.floor(np.nanpercentile(rdata.proc.get_curr_dB(),10))
-    vdmax = np.nanmax(rdata.proc.get_curr_dB())
+    # vdmin = np.floor(np.nanpercentile(out,20))
+    # vdmax = np.ceil(np.nanpercentile(out,95))
+    # vdmin = np.nanpercentile(out,5)
+    # vdmax = np.nanpercentile(out,90)
+    out = rdata.proc.get_curr_dB()
+    vdmin = np.floor(np.nanpercentile(out,10))
+    vdmax = np.nanmax(out)
 
     # radargram figure extent        
     extent = [0, rdata.tnum, rdata.snum, 0]
@@ -147,7 +167,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     # ax[0].set_title(rdata.fn)
 
     # uninterpreted radargram
-    ax[0].imshow(rdata.proc.get_curr_dB(), aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
+    ax[0].imshow(out, aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
     ax[0].set_ylim(int(extent[2]*params["yCutFact"]), 0)
     ax[0].set_xlim(extent[1]*params["xCutFact"][0], extent[1]*params["xCutFact"][1])
 
@@ -166,7 +186,7 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
             pnl = 1
             if rdata.flags.sim:
                 pnl = 2 
-        ax[pnl].imshow(rdata.proc.get_curr_dB(),  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
+        ax[pnl].imshow(out,  aspect="auto", extent=extent, cmap=params["cmap"], vmin=vdmin, vmax=vdmax)
         for (name, arr)  in horizon_dict.items():
             ax[pnl].plot(np.linspace(0,extent[1],rdata.tnum), arr, lw = 1, label=name)
         ax[pnl].set_ylim(int(extent[2]*params["yCutFact"]), 0)
@@ -252,10 +272,11 @@ def radargram(rdata, horizon_dict, elev_dict, params, simFlag, outPath):
     for i, axis in enumerate(ax):
         axis.yaxis.set_ticks_position('both')
         axis.xaxis.set_ticks_position('both')
+        # axis.tick_params('both', length=2.5, which='major')
         if i==nPanels - 1:
             axis.yaxis.set_ticks_position('both')
             lim = axis.get_ylim()
-            axis.set_yticks([250,500,750,1000])
+            # axis.set_yticks([250,500,750,1000])
             # axis.set_ylim(400,1500)
             # axis.set_ylim(lim[0],1000)
 
@@ -303,6 +324,7 @@ def main():
     parser.add_argument("-outpath", dest = "outPath", help="Path to to output generated radargrams")
     parser.add_argument("-elev", help="Flag: Include elevation profile", default=False, action="store_true")
     parser.add_argument("-sim", help="Flag: Include clutter simulation if present", default=False, action="store_true")
+    parser.add_argument("-rev", help="Flag: Reverse radar track (left,right flip)", default=False, action="store_true")
     args = parser.parse_args()
     pkPath = args.pickPath
 
@@ -310,12 +332,12 @@ def main():
     params = {}
     params["cmap"] = "Greys_r"                              # matplotlib.pyplot.imshow color map
     params["pnlHgt"] = 1                                    # panel height in inches for each panel in the generated radargram
-    params["pnlWidth"] = 3                                # panel width in inches for each panel in the generated radargram
-    params["yCutFact"] = 1/3                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
-    params["xCutFact"] = (.1,.55)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
+    params["pnlWidth"] = 2.4                                # panel width in inches for each panel in the generated radargram
+    params["yCutFact"] = 1/2                                # factor by which to trim the bottom portion of the radargram (.5 will preserve the upper half of the samples across the radargram)
+    params["xCutFact"] = (0,.5)                              # tuple, (left,right) factors by which to trim the radargram (0,1) will keep all traces
     params["yAxis"] = "time"                                # y axis label unit ("sample" or "time")
     params["xAxis"] = "distance"                            # x axis label unit ("trace" or "distance")
-    params["lgd_pos"] = "upper left"                        # matplotlib legend position in subplot
+    params["lgd_pos"] = "lower right"                        # matplotlib legend position in subplot
 
     # check if paths exists
     if not os.path.isdir(args.datPath):
@@ -337,18 +359,16 @@ def main():
         print(f"Output path not found: {args.outPath}")
         exit(1)
 
-
     # loop through list of files, load radargram and any picks, generate radargram
     for f in flist:
 
         # parse appropriate year
-        yr = f.split('_')[1][:4]
+        # yr = f.split('_')[1][:4]
 
         rdata, horizons_dict, elev_dict = load(
             f,
-            args.datPath + yr+ '/hdf5/',
-            pkPath,
-            args.elev
+            pkPath, 
+            args
         )            
         outPath = args.outPath + f + '.png'
 
