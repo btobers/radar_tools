@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
-import sys, os, argparse, fnmatch
+import sys, os, argparse, fnmatch, glob
 
 # script designed to merge RAGU picks from one directory in to a single csv file
 # BST, 20191127
@@ -80,39 +80,49 @@ def main():
     description='''Program for merging a directory containing multiple RAGU pick files into a single merged pick file\n\n$python ragu_picks_combine.py --pickfiles /home/user/data/flist.txt --outdir /tmp --outname merged_picks\nalternatively:\n$python ragu_picks_combine.py --pickfiles /home/user/data/pickfile1.csv /home/user/data/pickfile2.csv --outdir /tmp --outname merged_picks''', 
     formatter_class=argparse.RawTextHelpFormatter)
     
-    parser.add_argument("-pickfiles", help="Filepath for a list of RAGU pickfiles you with to merge (alternatively, a user entered list of pick files)", nargs="+", required=True)
-    parser.add_argument("-outdir", help="Output directory", required=True)
-    parser.add_argument("-outname", help="Output file name prefix (.csv and .gpkg files will be created with this name in outdir)", required=True)
+    parser.add_argument("-pickdir", help="Directory containing RAGU pickfiles you wish to merge", required=False)
+    parser.add_argument("-pickfiles", help="List of pick files", nargs="+", required=False)
+    parser.add_argument("-outdir", help="Output directory", required=False)
+    parser.add_argument("-outname", help="Output file name prefix (.csv and .gpkg files will be created with this name in outdir)", required=False)
     parser.add_argument('-merged', help='Flag: input files are merged from multiple tracks (not individual track pick files)', default=False, action='store_true')
     args = parser.parse_args()
 
-    # if length of args.pickfiles > 1, we'll assume the user is entering a list of pickfiles, else, we'll assume its a filepath to a list of pickfiles
-    if len(args.pickfiles) == 1:
-        args.pickfiles = args.pickfiles[0]
-        assert os.path.exists(args.pickfiles), f'RAGU pick file list does not exist: {args.pickfiles}'
-        try:
-            with open(args.pickfiles, 'r') as f:
-                pkfiles = f.read().splitlines()
-            pkfiles = [line.strip() for line in pkfiles if line.strip()]
-        except Exception as err:
-            print(f'Error: Could not read pick file list: {err}')
-            sys.exit()
+    if args.pickdir:
+        assert os.path.isdir(args.pickdir), f'File path does not exist: {args.pickdir}'
+        pkfiles = glob.glob(args.pickdir + '*pk*.csv')
 
-    elif len(args.pickfiles) > 1:
-        pkfiles = args.pickfiles
+    elif args.pickfiles:
+        if len(args.pickfiles) == 1:
+            args.pickfiles = args.pickfiles[0]
+            assert os.path.exists(args.pickfiles), f'File does not exist: {args.pickfiles}'
+            try:
+                with open(args.pickfiles, 'r') as f:
+                    pkfiles = f.read().splitlines()
+                pkfiles = [line.strip() for line in pkfiles if line.strip()]
+            except Exception as err:
+                print(f'Error: Could not read pick file list: {err}')
+                sys.exit()
+
+        elif len(args.pickfiles) > 1:
+            pkfiles = args.pickfiles
 
     # make sure each pick file exists
     for f in pkfiles:
         assert os.path.exists(f), f'RAGU pick file does not exist: {f}'
 
-    # assert that output path exists before merging
-    assert os.path.isdir(os.path.split(args.outdir)[0])    
+    if not args.outdir:
+        args.outdir = '/'.join(pkfiles[0].split('/')[0:-1])
+
+    os.makedirs(args.outdir,exist_ok=True)
+
+    if not args.outname:
+        args.outname = 'merged'
 
     # call the merge function to go through all files and merge all fields in pick files contained in path
     data = merge(flist=pkfiles, merged=args.merged)
 
     # convert dictionary to pandas dataframe, but add one column at a time so that they will all end up the same length
-    out = pd.DataFrame(dict([(col_name,pd.Series(values)) for col_name,values in data.items() ]))
+    out = pd.DataFrame(dict([(col_name,pd.Series(values)) for col_name,values in data.items()]))
 
     # get number of tracks
     print(f"{len(out['fname'].unique())} pick files combined.")
