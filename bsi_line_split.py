@@ -68,6 +68,9 @@ def buildH5(header, rx, gps, outfile):
 
         for k, v in header.items():
             rx0.attrs[k] = v
+        
+        string_t = h5py.string_dtype(encoding='ascii')
+        fd.attrs.create("system", "Blue Systems Integration IceRadar", dtype=string_t)
 
         fd.close()
     except Exception as e:
