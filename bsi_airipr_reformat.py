@@ -166,21 +166,22 @@ def parse(fpath='', outpath=''):
                 except:
                     agls.append(np.nan)
 
-
             # filter erroneous data
             lons = np.asarray(lons)
             lats = np.asarray(lats)
+            hgts = np.asarray(hgts)
 
-            idxs = np.where((lons >= -10) & (lons <= 10))[0]
+            idxs = np.logical_or((lons >= -10) & (lons <= 10),
+                                 (lats >= -10) & (lats <= 10),
+                                 )
+
             lats[idxs] = np.nan
             lons[idxs] = np.nan
+            hgts[idxs] = np.nan
 
-            idxs = np.where((lats >= -10) & (lats <= 10))[0]
-            lats[idxs] = np.nan
-            lons[idxs] = np.nan
-            
             lons = lons.tolist()
             lats = lats.tolist()
+            hgts = hgts.tolist()
 
             fix =  {"lons": lons, "lats": lats, "hgts": hgts, "times": times}
             tnum = data.shape[1]
