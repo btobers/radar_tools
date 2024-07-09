@@ -59,7 +59,8 @@ def parseHeader(dig_xml):
     header["stack"] = int(_xmlGetVal(dig_xml, 'Stacking'))
     header["spt"] = int(_xmlGetVal(dig_xml, 'RecordLength'))
     header["fs"] = float(_xmlGetVal(dig_xml, 'SampleRate'))
-    header["pre_trig"] = 0
+    toffset = float(_xmlGetVal(dig_xml, 'RelativeInitialX')) # this is the time offset recorded by the digitizer - will need to account for this and shift data accordingly 
+    header["pre_trig"] = int(toffset * header['fs'])
     header["prf"] = 512
 
     return header
@@ -209,6 +210,11 @@ def parse(fpath='', outpath=''):
                 d = outpath
             # fn = fn.split('.')[]
             file = d + '/' + fn.split('.')[0] + '_' + ln + '.h5'
+
+            # shift data to account for 'RelativeInitialX' attribute in the digitizer xml record - this should be a negative number
+            if header['pre_trig'] < 0:
+                data = np.roll(data, shift=header['pre_trig'], axis=0)
+                header['pre_trig'] = 0
 
             # rebuild h5 format, following same structure as groundhog for simplicity
             if buildH5(header, data, gps, agl, file) == -1:
