@@ -22,7 +22,6 @@ def interp_xords(arr):
 def sort_by_numeric_value(s):
     return int(s.split('_')[1])  # Split the string by '_' and return the second part as an integer
 
-
 # Convert degrees minutes seconds to decimal degrees
 def dm2dd(dms):
     return int(dms/100) + (dms - 100*int(dms/100))/60
