@@ -8,6 +8,15 @@ import numpy as np
 import sys, glob, os, argparse, re
 from datetime import datetime, timedelta
 
+# Interpolate nans in array
+def interp_xords(arr):
+    nan_indices = np.isnan(arr)
+    non_nan_indices = ~nan_indices
+    non_nan_values = arr[non_nan_indices]
+    indices = np.arange(len(arr))
+    # linearly interpolate NaN values
+    arr[nan_indices] = np.interp(indices[nan_indices], indices[non_nan_indices], non_nan_values)
+    return arr
 
 # Define a custom sorting function
 def sort_by_numeric_value(s):
@@ -159,26 +168,31 @@ def parse(fpath='', outpath=''):
             #############################
             ### filter erroneous data ###
             #############################
-            lons = np.asarray(lons)
-            lats = np.asarray(lats)
-            hgts = np.asarray(hgts)
+            lons_filt = np.asarray(lons)
+            lats_filt = np.asarray(lats)
+            hgts_filt = np.asarray(hgts)
 
-            idxs = np.logical_or((lons >= -10) & (lons <= 10),
-                                 (lats >= -10) & (lats <= 10),
+            idxs = np.logical_or((lons_filt >= -10) & (lons_filt <= 10),
+                                 (lats_filt >= -10) & (lats_filt <= 10),
                                  )
 
-            lats[idxs] = np.nan
-            lons[idxs] = np.nan
-            hgts[idxs] = np.nan
+            lats_filt[idxs] = np.nan
+            lons_filt[idxs] = np.nan
+            hgts_filt[idxs] = np.nan
 
-            lons = lons.tolist()
-            lats = lats.tolist()
-            hgts = hgts.tolist()
+            # interpolate over nans
+            lats_filt = interp_xords(lats_filt)
+            lons_filt = interp_xords(lons_filt)
+            hgts_filt = interp_xords(hgts_filt)
+
+            lons_filt = lons_filt.tolist()
+            lats_filt = lats_filt.tolist()
+            hgts_filt = hgts_filt.tolist()
             #############################
             #############################
             #############################
 
-            fix =  {"lons": lons, "lats": lats, "hgts": hgts, "times": times}
+            fix =  {"lons": lons_filt, "lats": lats_filt, "hgts": hgts_filt, "times": times}
             tnum = data.shape[1]
 
             # get fix to right datattype for hdf5
