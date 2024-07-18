@@ -106,6 +106,7 @@ def parse(fpath='', outpath=''):
     # read in .h5 file
     with h5py.File(fpath, "r")  as fd:
         # get date string from file as datetime obj
+        ### note, this assumes the radar data files have been saved with the ending being '_YYYYMMDD.hdf5'
         datestr = fpath.split('/')[-1].split('_')[-1].split('.')[0]
         date_obj = datetime.strptime(datestr, "%Y%m%d") 
         lns = sorted(fd.keys(), key=sort_by_numeric_value)
