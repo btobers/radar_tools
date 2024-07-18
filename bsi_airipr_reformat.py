@@ -171,6 +171,7 @@ def parse(fpath='', outpath=''):
             lats_filt = np.asarray(lats)
             hgts_filt = np.asarray(hgts)
 
+            # any trace with a lat or long between +/- 10 deg. must bad data
             idxs = np.logical_or((lons_filt >= -10) & (lons_filt <= 10),
                                  (lats_filt >= -10) & (lats_filt <= 10),
                                  )
