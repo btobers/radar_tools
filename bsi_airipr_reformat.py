@@ -7,8 +7,6 @@ import h5py
 import numpy as np
 import sys, glob, os, argparse, re
 from datetime import datetime, timedelta
-from pyproj import Transformer
-import matplotlib.pyplot as plt
 
 
 # Define a custom sorting function
@@ -16,10 +14,11 @@ def sort_by_numeric_value(s):
     return int(s.split('_')[1])  # Split the string by '_' and return the second part as an integer
 
 
+# Convert degrees minutes seconds to decimal degrees
 def dm2dd(dms):
     return int(dms/100) + (dms - 100*int(dms/100))/60
 
-
+# Convert from GPS UTC timestamp to datetime object
 def _2dt(date_obj, hhmmss):
     h = hhmmss[:2]
     m = hhmmss[2:4]
@@ -29,17 +28,7 @@ def _2dt(date_obj, hhmmss):
     utc_datetime = datetime.combine(date_obj, datetime.min.time()) + timedelta(seconds=sec)
     return utc_datetime
 
-
-def get_xformer(crs_from, crs_to="+proj=geocent +a=6378140 +b=6356750 +no_defs"):
-    return Transformer.from_crs(crs_from=crs_from, crs_to=crs_to)
-
-
-def euclid_dist(xarray, yarray, zarray):
-    dist = np.zeros_like(xarray)
-    dist[1:] = np.nancumsum(np.sqrt(np.diff(xarray) ** 2.0 + np.diff(yarray) ** 2.0 + np.diff(zarray) ** 2.0))
-    return dist
-
-
+# Pull value from XML string given key
 def _xmlGetVal(xml, name):
     """
     Borrowed from dlilien's impDAR: Look up a value in an XML fragment. Mod from Nat Wilson's irlib.
@@ -53,19 +42,19 @@ def _xmlGetVal(xml, name):
     else:
         return None
 
-
-def parseHeader(dig_xml):
+# Build header
+def buildHeader(dig_xml):
     header = {}
     header["stack"] = int(_xmlGetVal(dig_xml, 'Stacking'))
     header["spt"] = int(_xmlGetVal(dig_xml, 'RecordLength'))
     header["fs"] = float(_xmlGetVal(dig_xml, 'SampleRate'))
     toffset = float(_xmlGetVal(dig_xml, 'RelativeInitialX')) # this is the time offset recorded by the digitizer - will need to account for this and shift data accordingly 
     header["pre_trig"] = int(toffset * header['fs'])
-    header["prf"] = 512
+    header["prf"] = 512     # hard coded for AirIPR
 
     return header
 
-
+# Build Groundhog-format hdf5 file
 def buildH5(header, rx, gps, agl, outfile):
     """
     buildhdf5 format borrowed from Groundhog radar system, courtesy of Michael Christoffersen
@@ -103,7 +92,7 @@ def buildH5(header, rx, gps, agl, outfile):
 
     return 0
 
-
+# Parse AirIPR hdf5 file
 def parse(fpath='', outpath=''):
 
     # read in .h5 file
@@ -115,7 +104,7 @@ def parse(fpath='', outpath=''):
         for ln in lns:
             line = fd[ln]
             # get header info 
-            header = parseHeader(line[list(line.keys())[0]]["datacapture_0/echogram_0"].attrs['DigitizerMetaData_xml'])
+            header = buildHeader(line[list(line.keys())[0]]["datacapture_0/echogram_0"].attrs['DigitizerMetaData_xml'])
             # initialize data array
             data = np.zeros((header["spt"], len(line)))
 
@@ -167,7 +156,9 @@ def parse(fpath='', outpath=''):
                 except:
                     agls.append(np.nan)
 
-            # filter erroneous data
+            #############################
+            ### filter erroneous data ###
+            #############################
             lons = np.asarray(lons)
             lats = np.asarray(lats)
             hgts = np.asarray(hgts)
@@ -183,6 +174,9 @@ def parse(fpath='', outpath=''):
             lons = lons.tolist()
             lats = lats.tolist()
             hgts = hgts.tolist()
+            #############################
+            #############################
+            #############################
 
             fix =  {"lons": lons, "lats": lats, "hgts": hgts, "times": times}
             tnum = data.shape[1]
