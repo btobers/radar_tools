@@ -114,11 +114,11 @@ def parse(fpath='', outpath=''):
             line = fd[ln]
             # get header info 
             header = buildHeader(line[list(line.keys())[0]]["datacapture_0/echogram_0"].attrs['DigitizerMetaData_xml'])
+            # loop through traces - first filter out any that don't start with `location_``
+            traces = [s for s in line.keys() if s.startswith("location_")]
+            traces = sorted(traces, key=sort_by_numeric_value)
             # initialize data array
-            data = np.zeros((header["spt"], len(line)))
-
-            # loop through traces
-            traces = sorted(line.keys(), key=sort_by_numeric_value)
+            data = np.zeros((header["spt"], len(traces)))
 
             # initialize latitude and longitude lists variables to store values
             lats = []
@@ -128,13 +128,14 @@ def parse(fpath='', outpath=''):
             agls = []
 
             # loop through traces
-            for t in traces:
-                tmp = t.split("_")
-                if len(tmp)==2:
-                    i=int(tmp[-1])
-                else:
-                    data = data[:,:-1]
-                    continue
+            for i in range(len(traces)):
+                # tmp = t.split("_")
+                # if len(tmp)==2:
+                #     i=int(tmp[-1])
+                # else:
+                #     data = data[:,:-1]
+                #     continue
+                t = traces[i]
 
                 # fill in data array
                 data[:,i] = line[t]["datacapture_0/echogram_0"][:]
